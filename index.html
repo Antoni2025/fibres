@@ -53,7 +53,7 @@
   <div>
     <h4>Fibra E</h4>
     Longitud (mm): <input id="E_len" type="number" value="1"><br>
-    Diàmetre (µm): <input id="E_th" type="number" value="20"><br>
+    Diàmetre (µm): <input id="E_th" type="number" value="9"><br>
     Densitat (kg/m³): <input id="E_rho" type="number" value="1500"><br>
     % Massa: <input id="E_pct" type="number" value="40"><br>
   </div>
@@ -61,7 +61,7 @@
   <div>
     <h4>Fibra C</h4>
     Longitud (mm): <input id="C_len" type="number" value="2"><br>
-    Diàmetre (µm): <input id="C_th" type="number" value="20"><br>
+    Diàmetre (µm): <input id="C_th" type="number" value="9"><br>
     Densitat (kg/m³): <input id="C_rho" type="number" value="1500"><br>
     % Massa: <input id="C_pct" type="number" value="35"><br>
   </div>
@@ -69,14 +69,14 @@
   <div>
     <h4>Fibra P</h4>
     Longitud (mm): <input id="P_len" type="number" value="6.5"><br>
-    Diàmetre (µm): <input id="P_th" type="number" value="20"><br>
+    Diàmetre (µm): <input id="P_th" type="number" value="9"><br>
     Densitat (kg/m³): <input id="P_rho" type="number" value="1180"><br>
     % Massa: <input id="P_pct" type="number" value="25"><br>
   </div>
 
   <hr>
 
-  Total fibres visuals: <input id="total" type="number" value="1000"><br><br>
+  Total fibres visuals: <input id="total" type="number" value="3000"><br><br>
 
   <button onclick="genera()">Generar</button>
 
@@ -113,32 +113,45 @@ function dibuixaFibra(x, y, angle, longitud_px, gruix_px, color) {
   ctx.stroke();
 }
 
-// --- Generació homogènia de punts (Poisson Disk simplificat) ---
-function generaPuntsHomogenis(num, minDist) {
-  const punts = [];
-  let intents = 0;
-  const maxIntents = num * 30;
+// --- Poisson suau: evita acumulacions però permet més densitat ---
+function poissonSuau(num, minDist) {
+  const pts = [];
 
-  while (punts.length < num && intents < maxIntents) {
-    intents++;
+  for (let i = 0; i < num; i++) {
+    let x = Math.random() * canvas.width;
+    let y = Math.random() * canvas.height;
 
-    const x = Math.random() * canvas.width;
-    const y = Math.random() * canvas.height;
+    // Ajust suau: si està massa a prop, el movem una mica
+    for (let iter = 0; iter < 10; iter++) {
+      let tooClose = false;
 
-    let valid = true;
-    for (const p of punts) {
-      const dx = p.x - x;
-      const dy = p.y - y;
-      if (dx*dx + dy*dy < minDist * minDist) {
-        valid = false;
-        break;
+      for (const p of pts) {
+        const dx = p.x - x;
+        const dy = p.y - y;
+        const d2 = dx*dx + dy*dy;
+
+        if (d2 < minDist * minDist) {
+          tooClose = true;
+
+          // Movem lleugerament el punt
+          x += (Math.random() - 0.5) * minDist * 0.5;
+          y += (Math.random() - 0.5) * minDist * 0.5;
+
+          // Mantenim dins del canvas
+          x = Math.max(0, Math.min(canvas.width, x));
+          y = Math.max(0, Math.min(canvas.height, y));
+
+          break;
+        }
       }
+
+      if (!tooClose) break;
     }
 
-    if (valid) punts.push({ x, y });
+    pts.push({x, y});
   }
 
-  return punts;
+  return pts;
 }
 
 function genera() {
@@ -170,7 +183,6 @@ function genera() {
     }
   ];
 
-  // Conversió d'unitats i càlcul de massa per fibra
   fibres.forEach(f => {
     const L_m = f.L_mm * 1e-3;
     const d_m = f.d_um * 1e-6;
@@ -178,22 +190,19 @@ function genera() {
     f.V = Math.PI * Math.pow(d_m / 2, 2) * L_m;
     f.m_fibra = f.rho * f.V;
 
-    // Escalat visual
     f.L_px = f.L_mm * 40;
     f.d_px = f.d_um * 0.1;
   });
 
-  // Normalització massiva
   const denom = fibres.reduce((acc, f) => acc + f.p / f.m_fibra, 0);
 
   fibres.forEach(f => {
     f.n = Math.round((f.p / f.m_fibra) / denom * N);
   });
 
-  // Dibuix amb distribució homogènia
   fibres.forEach(f => {
-    const minDist = Math.max(f.L_px * 0.2, f.d_px * 4);
-    const punts = generaPuntsHomogenis(f.n, minDist);
+    const minDist = f.L_px * 0.35; // Poisson suau: distància reduïda
+    const punts = poissonSuau(f.n, minDist);
 
     punts.forEach(p => {
       const angle = Math.random() * Math.PI * 2;
