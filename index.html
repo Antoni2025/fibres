@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<title>Simulació de Fibres (Percentatge en Massa)</title>
+<style>
+  body {
+    font-family: sans-serif;
+    display: flex;
+    gap: 20px;
+    padding: 20px;
+    background: #f0f0f0;
+  }
+  #controls {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    width: 300px;
+    box-shadow: 0 0 5px rgba(0,0,0,0.2);
+  }
+  canvas {
+    background: white;
+    border: 1px solid #aaa;
+  }
+  input[type="number"] {
+    width: 90px;
+  }
+  .legend {
+    margin-top: 15px;
+    padding: 10px;
+    background: #fff;
+    border-radius: 6px;
+    box-shadow: 0 0 4px rgba(0,0,0,0.15);
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .legend-color {
+    width: 18px;
+    height: 18px;
+    margin-right: 8px;
+    border: 1px solid #333;
+  }
+</style>
+</head>
+<body>
+
+<div id="controls">
+  <h3>Paràmetres de les fibres</h3>
+
+  <div>
+    <h4>Fibra E</h4>
+    Longitud (mm): <input id="E_len" type="number" value="1"><br>
+    Diàmetre (µm): <input id="E_th" type="number" value="20"><br>
+    Densitat (kg/m³): <input id="E_rho" type="number" value="1500"><br>
+    % Massa: <input id="E_pct" type="number" value="40"><br>
+  </div>
+
+  <div>
+    <h4>Fibra C</h4>
+    Longitud (mm): <input id="C_len" type="number" value="2"><br>
+    Diàmetre (µm): <input id="C_th" type="number" value="20"><br>
+    Densitat (kg/m³): <input id="C_rho" type="number" value="1500"><br>
+    % Massa: <input id="C_pct" type="number" value="35"><br>
+  </div>
+
+  <div>
+    <h4>Fibra P</h4>
+    Longitud (mm): <input id="P_len" type="number" value="6.5"><br>
+    Diàmetre (µm): <input id="P_th" type="number" value="20"><br>
+    Densitat (kg/m³): <input id="P_rho" type="number" value="1180"><br>
+    % Massa: <input id="P_pct" type="number" value="25"><br>
+  </div>
+
+  <hr>
+
+  Total fibres visuals: <input id="total" type="number" value="1000"><br><br>
+
+  <button onclick="genera()">Generar</button>
+
+  <div class="legend">
+    <h4>Llegenda</h4>
+    <div class="legend-item">
+      <div class="legend-color" style="background:red;"></div> Fibra E
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background:blue;"></div> Fibra C
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background:green;"></div> Fibra P
+    </div>
+  </div>
+
+</div>
+
+<canvas id="fibres" width="900" height="700"></canvas>
+
+<script>
+const canvas = document.getElementById("fibres");
+const ctx = canvas.getContext("2d");
+
+function dibuixaFibra(x, y, angle, longitud_px, gruix_px, color) {
+  const x2 = x + Math.cos(angle) * longitud_px;
+  const y2 = y + Math.sin(angle) * longitud_px;
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = gruix_px;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+}
+
+function genera() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const N = parseInt(document.getElementById("total").value);
+
+  const fibres = [
+    {
+      color: "red",
+      L_mm: parseFloat(document.getElementById("E_len").value),
+      d_um: parseFloat(document.getElementById("E_th").value),
+      rho: parseFloat(document.getElementById("E_rho").value),
+      p: parseFloat(document.getElementById("E_pct").value) / 100
+    },
+    {
+      color: "blue",
+      L_mm: parseFloat(document.getElementById("C_len").value),
+      d_um: parseFloat(document.getElementById("C_th").value),
+      rho: parseFloat(document.getElementById("C_rho").value),
+      p: parseFloat(document.getElementById("C_pct").value) / 100
+    },
+    {
+      color: "green",
+      L_mm: parseFloat(document.getElementById("P_len").value),
+      d_um: parseFloat(document.getElementById("P_th").value),
+      rho: parseFloat(document.getElementById("P_rho").value),
+      p: parseFloat(document.getElementById("P_pct").value) / 100
+    }
+  ];
+
+  // Conversió d'unitats i càlcul de massa per fibra
+  fibres.forEach(f => {
+    const L_m = f.L_mm * 1e-3;
+    const d_m = f.d_um * 1e-6;
+
+    f.V = Math.PI * Math.pow(d_m / 2, 2) * L_m;
+    f.m_fibra = f.rho * f.V;
+
+    // Escalat visual
+    f.L_px = f.L_mm * 40;     // 1 mm ≈ 40 px
+    f.d_px = f.d_um * 0.1;    // 10 µm ≈ 1 px
+  });
+
+  // Normalització massiva
+  const denom = fibres.reduce((acc, f) => acc + f.p / f.m_fibra, 0);
+
+  fibres.forEach(f => {
+    f.n = Math.round((f.p / f.m_fibra) / denom * N);
+  });
+
+  // Dibuix
+  fibres.forEach(f => {
+    for (let i = 0; i < f.n; i++) {
+      const x = Math.random() * canvas.width;
+      const y = Math.random() * canvas.height;
+      const angle = Math.random() * Math.PI * 2;
+
+      dibuixaFibra(x, y, angle, f.L_px, f.d_px, f.color);
+    }
+  });
+}
+</script>
+
+</body>
+</html>
