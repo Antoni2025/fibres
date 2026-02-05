@@ -113,6 +113,34 @@ function dibuixaFibra(x, y, angle, longitud_px, gruix_px, color) {
   ctx.stroke();
 }
 
+// --- Generació homogènia de punts (Poisson Disk simplificat) ---
+function generaPuntsHomogenis(num, minDist) {
+  const punts = [];
+  let intents = 0;
+  const maxIntents = num * 30;
+
+  while (punts.length < num && intents < maxIntents) {
+    intents++;
+
+    const x = Math.random() * canvas.width;
+    const y = Math.random() * canvas.height;
+
+    let valid = true;
+    for (const p of punts) {
+      const dx = p.x - x;
+      const dy = p.y - y;
+      if (dx*dx + dy*dy < minDist * minDist) {
+        valid = false;
+        break;
+      }
+    }
+
+    if (valid) punts.push({ x, y });
+  }
+
+  return punts;
+}
+
 function genera() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -151,8 +179,8 @@ function genera() {
     f.m_fibra = f.rho * f.V;
 
     // Escalat visual
-    f.L_px = f.L_mm * 40;     // 1 mm ≈ 40 px
-    f.d_px = f.d_um * 0.1;    // 10 µm ≈ 1 px
+    f.L_px = f.L_mm * 40;
+    f.d_px = f.d_um * 0.1;
   });
 
   // Normalització massiva
@@ -162,15 +190,15 @@ function genera() {
     f.n = Math.round((f.p / f.m_fibra) / denom * N);
   });
 
-  // Dibuix
+  // Dibuix amb distribució homogènia
   fibres.forEach(f => {
-    for (let i = 0; i < f.n; i++) {
-      const x = Math.random() * canvas.width;
-      const y = Math.random() * canvas.height;
-      const angle = Math.random() * Math.PI * 2;
+    const minDist = Math.max(f.L_px * 0.2, f.d_px * 4);
+    const punts = generaPuntsHomogenis(f.n, minDist);
 
-      dibuixaFibra(x, y, angle, f.L_px, f.d_px, f.color);
-    }
+    punts.forEach(p => {
+      const angle = Math.random() * Math.PI * 2;
+      dibuixaFibra(p.x, p.y, angle, f.L_px, f.d_px, f.color);
+    });
   });
 }
 </script>
